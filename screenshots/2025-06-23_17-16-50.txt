@@ -1,0 +1,15 @@
+AWS provides many tools for monitoring hice le)(-urereting EC2 instance issues.
+
+Which of the following are tools listed under the Actions, Monitor and troubleshoot
+
+menu of an EC2 instance? (Select THREE.)
+
+Get system log
+
+Change security groups
+Get instance screenshot
+EC2 serial console
+
+Change stop protection
+
+Attach network interface

@@ -1,0 +1,12 @@
+What are the types of trails that can be created in AWS CloudTrail that permit delivery to
+an Amazon S3 bucket? (Select TWO.)
+
+A trail that applies to all Regions
+
+A trail that applies to all partitions
+
+A trail that applies to the AWS GovCloud (US) Region
+
+A trail that applies to one Region
+
+A trail that applies to just instances

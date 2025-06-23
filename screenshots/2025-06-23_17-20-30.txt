@@ -1,0 +1,8 @@
+Which of the following are valid approaches to an observability strategy? (Select TWO.)
+
+Step-by-step
+
+Outside-in
+
+Inside-out
+

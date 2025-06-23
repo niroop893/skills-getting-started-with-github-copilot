@@ -1,0 +1,20 @@
+Amazon EC2 performs automated checks on every running EC2 instance to identify
+hardware and software issues. Which of the following statements are true for Amazon
+
+EC2 automated status checks? (Select TWO.)
+
+System status checks determine the health of the operating system in the
+EC2 instance.
+
+System status checks determine if the AWS systems hosting the EC2
+instance are healthy.
+
+Instance status checks determine if the AWS systems hosting the EC2
+instance are healthy.
+
+Instance status checks monitor the software and network configuration of
+your individual instance.
+
+System status checks determine the health of the network connectivity of
+your individual instance.
+

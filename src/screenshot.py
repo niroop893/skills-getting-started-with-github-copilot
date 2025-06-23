@@ -4,6 +4,7 @@ import os
 import tkinter as tk
 from tkinter import messagebox
 import ctypes
+import sys
 
 try:
     import pytesseract
@@ -17,29 +18,46 @@ except Exception as e:
     OCR_AVAILABLE = False
     print(f"Error initializing pytesseract: {e}. OCR functionality will be disabled.")
 
-def get_scaling_factor():
-    user32 = ctypes.windll.user32
-    user32.SetProcessDPIAware()
-    screen_width = user32.GetSystemMetrics(0)
-    screen_height = user32.GetSystemMetrics(1)
-    
-    root = tk.Tk()
-    tk_width = root.winfo_screenwidth()
-    tk_height = root.winfo_screenheight()
-    root.destroy()
+def get_dpi_awareness():
+    """Get the DPI awareness of the current process"""
+    try:
+        import ctypes
+        awareness = ctypes.c_int()
+        ctypes.windll.shcore.GetProcessDpiAwareness(0, ctypes.byref(awareness))
+        return awareness.value
+    except:
+        return 0
 
-    scale_x = screen_width / tk_width
-    scale_y = screen_height / tk_height
-    return scale_x, scale_y
+def set_dpi_awareness():
+    """Set the DPI awareness of the current process"""
+    try:
+        import ctypes
+        if hasattr(ctypes.windll, 'shcore'):
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
+        else:
+            ctypes.windll.user32.SetProcessDPIAware()
+        return True
+    except:
+        return False
+
+# Set DPI awareness at the start
+set_dpi_awareness()
 
 class ScreenshotApp:
     def __init__(self, root):
         self.root = root
-        self.scale_x, self.scale_y = get_scaling_factor()
         self.root.title("Screenshot Tool")
         self.root.attributes('-fullscreen', True)
         self.root.attributes('-alpha', 0.3) 
         self.root.configure(cursor="cross")
+        
+        # Get screen dimensions
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
+        
+        # Print debug info
+        print(f"Screen dimensions: {self.screen_width}x{self.screen_height}")
+        print(f"DPI Awareness: {get_dpi_awareness()}")
         
         # Variables to store rectangle coordinates
         self.start_x = None
@@ -59,7 +77,7 @@ class ScreenshotApp:
         
         instructions = "Click and drag to select area. Press ESC to cancel."
         self.canvas.create_text(
-            self.root.winfo_screenwidth() // 2, 20,
+            self.screen_width // 2, 20,
             text=instructions, fill="black",
             font=("Arial", 16, "bold")
         )
@@ -85,10 +103,14 @@ class ScreenshotApp:
         self.root.after(200, self.take_screenshot)
 
     def take_screenshot(self):
-        left = int(min(self.start_x, self.end_x) * self.scale_x)
-        top = int(min(self.start_y, self.end_y) * self.scale_y)
-        right = int(max(self.start_x, self.end_x) * self.scale_x)
-        bottom = int(max(self.start_y, self.end_y) * self.scale_y)
+        # Use the coordinates directly without scaling
+        left = min(self.start_x, self.end_x)
+        top = min(self.start_y, self.end_y)
+        right = max(self.start_x, self.end_x)
+        bottom = max(self.start_y, self.end_y)
+
+        # Print debug info
+        print(f"Selection coordinates: ({left}, {top}) to ({right}, {bottom})")
 
         if right-left < 10 or bottom-top < 10:
             messagebox.showinfo("Selection too small", "Please select a larger area")
@@ -100,9 +122,18 @@ class ScreenshotApp:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         img_path = os.path.join(folder, f"{timestamp}.png")
 
-        screenshot = ImageGrab.grab(bbox=(left, top, right, bottom))
-        screenshot.save(img_path)
-        print(f"Screenshot saved at: {img_path}")
+        # Take the screenshot
+        try:
+            # Try with direct coordinates first
+            screenshot = ImageGrab.grab(bbox=(left, top, right, bottom))
+            screenshot.save(img_path)
+            print(f"Screenshot saved at: {img_path}")
+        except Exception as e:
+            print(f"Error taking screenshot: {e}")
+            import traceback
+            traceback.print_exc()
+            self.root.destroy()
+            return
         
         if OCR_AVAILABLE:
             try:
@@ -127,6 +158,26 @@ def take_screenshot():
     root = tk.Tk()
     ScreenshotApp(root)
     root.mainloop()
+
+def take_full_screenshot():
+    folder = "screenshots"
+    os.makedirs(folder, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    img_path = os.path.join(folder, f"{timestamp}_full.png")
+    
+    screenshot = ImageGrab.grab()
+    screenshot.save(img_path)
+    print(f"Full screenshot saved at: {img_path}")
+    
+    if OCR_AVAILABLE:
+        try:
+            text = pytesseract.image_to_string(screenshot)
+            txt_path = os.path.join(folder, f"{timestamp}_full.txt")
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                f.write(text)
+            print(f"OCR text saved at: {txt_path}")
+        except Exception as e:
+            print(f"OCR Error: {e}")
 
 if __name__ == "__main__":
     take_screenshot()
