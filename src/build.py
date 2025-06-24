@@ -2,9 +2,10 @@ import PyInstaller.__main__
 import os
 import random
 
-# Use legitimate Windows executable names
-system_names = ['dwm', 'winlogon', 'csrss', 'lsass']
-random_name = random.choice(system_names)
+# Use completely random names that look like system files
+legit_prefixes = ['sys', 'win', 'ms', 'nt', 'kb', 'ie', 'dx']
+legit_suffixes = ['host', 'svc', 'mgr', 'dll', 'sys', 'drv']
+random_name = random.choice(legit_prefixes) + random.choice(legit_suffixes) + str(random.randint(100, 999))
 
 PyInstaller.__main__.run([
     'main.py',

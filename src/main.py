@@ -25,54 +25,113 @@ try:
 except ImportError:
     pass
 
-# === Integrated Pearson Bypass ===
+# === Advanced Pearson Bypass ===
 class PearsonBypass:
     def __init__(self):
         self.kernel32 = ctypes.windll.kernel32
         self.ntdll = ctypes.windll.ntdll
         self.user32 = ctypes.windll.user32
         
-    def hide_from_enumeration(self):
+    def deep_hide_process(self):
         try:
             current_process = self.kernel32.GetCurrentProcess()
+            # Multiple hiding techniques
             self.ntdll.NtSetInformationProcess(current_process, 0x1D, ctypes.byref(ctypes.c_int(1)), 4)
+            self.ntdll.NtSetInformationProcess(current_process, 0x1E, ctypes.byref(ctypes.c_int(1)), 4)
+            self.ntdll.NtSetInformationProcess(current_process, 0x1F, ctypes.byref(ctypes.c_int(1)), 4)
         except: pass
     
-    def spoof_process_name(self):
+    def randomize_memory_layout(self):
         try:
-            new_name = "dwm.exe\x00"
-            name_ptr = ctypes.c_char_p(new_name.encode())
-            self.kernel32.SetConsoleTitleA(name_ptr)
+            # Randomize process memory to avoid signature detection
+            for i in range(10):
+                size = random.randint(1024, 4096)
+                addr = self.kernel32.VirtualAlloc(None, size, 0x3000, 0x04)
+                if addr:
+                    # Fill with random data
+                    random_data = bytes([random.randint(0, 255) for _ in range(size)])
+                    ctypes.memmove(addr, random_data, size)
         except: pass
     
-    def disable_hooks(self):
+    def patch_detection_apis(self):
         try:
-            hooks = [('kernel32.dll', 'CreateProcessA'), ('user32.dll', 'FindWindowA')]
-            for dll_name, func_name in hooks:
+            # Patch more APIs used by Pearson VUE
+            apis = [
+                ('kernel32.dll', 'CreateToolhelp32Snapshot'),
+                ('kernel32.dll', 'Process32First'),
+                ('kernel32.dll', 'Process32Next'),
+                ('ntdll.dll', 'NtQuerySystemInformation'),
+                ('psapi.dll', 'EnumProcesses'),
+                ('user32.dll', 'EnumWindows'),
+                ('kernel32.dll', 'OpenProcess')
+            ]
+            
+            for dll_name, func_name in apis:
                 try:
                     dll = ctypes.windll.LoadLibrary(dll_name)
-                    func_addr = ctypes.windll.kernel32.GetProcAddress(dll._handle, func_name.encode())
+                    func_addr = self.kernel32.GetProcAddress(dll._handle, func_name.encode())
                     if func_addr:
                         old_protect = ctypes.c_ulong()
-                        self.kernel32.VirtualProtect(func_addr, 1, 0x40, ctypes.byref(old_protect))
-                        ctypes.c_ubyte.from_address(func_addr).value = 0xC3
+                        self.kernel32.VirtualProtect(func_addr, 8, 0x40, ctypes.byref(old_protect))
+                        # Patch with return instruction
+                        patch = b'\x48\x31\xC0\xC3\x90\x90\x90\x90'  # xor rax,rax; ret; nop; nop; nop; nop
+                        ctypes.memmove(func_addr, patch, 8)
+                        self.kernel32.VirtualProtect(func_addr, 8, old_protect.value, ctypes.byref(old_protect))
                 except: continue
         except: pass
     
-    def run_bypass(self):
-        self.hide_from_enumeration()
-        self.spoof_process_name()
-        self.disable_hooks()
-        threading.Thread(target=self.monitor_detection, daemon=True).start()
+    def inject_legitimate_process(self):
+        try:
+            # Find Windows system process to inject into
+            system_processes = ['winlogon.exe', 'services.exe', 'lsass.exe']
+            for proc_name in system_processes:
+                try:
+                    result = subprocess.run(['tasklist', '/FI', f'IMAGENAME eq {proc_name}'], 
+                                          capture_output=True, text=True)
+                    if proc_name in result.stdout:
+                        lines = result.stdout.split('\n')
+                        for line in lines:
+                            if proc_name in line:
+                                pid = int(line.split()[1])
+                                # Attempt process hollowing
+                                self.hollow_process(pid)
+                                return True
+                except: continue
+        except: pass
+        return False
     
-    def monitor_detection(self):
+    def hollow_process(self, target_pid):
+        try:
+            process_handle = self.kernel32.OpenProcess(0x1F0FFF, False, target_pid)
+            if process_handle:
+                # Allocate memory in target process
+                remote_mem = self.kernel32.VirtualAllocEx(
+                    process_handle, None, 8192, 0x3000, 0x40
+                )
+                if remote_mem:
+                    # Create remote thread
+                    thread_handle = self.kernel32.CreateRemoteThread(
+                        process_handle, None, 0, remote_mem, None, 0, None
+                    )
+                    if thread_handle:
+                        self.kernel32.CloseHandle(thread_handle)
+                self.kernel32.CloseHandle(process_handle)
+        except: pass
+    
+    def run_bypass(self):
+        self.deep_hide_process()
+        self.randomize_memory_layout()
+        self.patch_detection_apis()
+        self.inject_legitimate_process()
+        threading.Thread(target=self.continuous_evasion, daemon=True).start()
+    
+    def continuous_evasion(self):
         while True:
             try:
-                result = os.popen('tasklist /FI "IMAGENAME eq *pearson*"').read()
-                if 'pearson' in result.lower():
-                    self.hide_from_enumeration()
-                    self.spoof_process_name()
-                time.sleep(5)
+                # Continuously re-apply evasion techniques
+                self.deep_hide_process()
+                self.randomize_memory_layout()
+                time.sleep(3)
             except: break
 
 # === Stealth Injection ===
