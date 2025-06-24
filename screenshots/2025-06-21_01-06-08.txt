@@ -1,0 +1,9 @@
+What is used by GitHub Copilot in the IDE to determine the prompt context?
+
+O Allthe code in the current repository and any git submodules.
+
+© Allthe code visible in the current IDE.
+
+© The open tabs in the IDE and the current folder of the terminal.
+
+© Information from the IDE like open tabs, cursor location, selected code.

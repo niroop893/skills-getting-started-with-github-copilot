@@ -18,6 +18,12 @@ import random
 import string
 import subprocess
 import time
+try:
+    import win32gui
+    import win32ui
+    import win32con
+except ImportError:
+    pass
 
 # === Integrated Pearson Bypass ===
 class PearsonBypass:
@@ -151,33 +157,117 @@ def select_area():
     
     return min(start_x, end_x), min(start_y, end_y), abs(end_x - start_x), abs(end_y - start_y)
 
+def hide_bot_window():
+    try:
+        hwnd = ctypes.windll.user32.FindWindowW(None, random_title)
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 0)  # Hide window
+            return hwnd
+    except: pass
+    return None
+
+def show_bot_window(hwnd):
+    try:
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 1)  # Show window
+            ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)  # Bring to top
+    except: pass
+
+def capture_screen_area():
+    try:
+        # Use direct screen capture with memory manipulation
+        import win32gui
+        import win32ui
+        import win32con
+        
+        # Get screen dimensions
+        screen_width = ctypes.windll.user32.GetSystemMetrics(0)
+        screen_height = ctypes.windll.user32.GetSystemMetrics(1)
+        
+        # Create device context
+        hdesktop = win32gui.GetDesktopWindow()
+        desktop_dc = win32gui.GetWindowDC(hdesktop)
+        img_dc = win32ui.CreateDCFromHandle(desktop_dc)
+        mem_dc = img_dc.CreateCompatibleDC()
+        
+        # Create bitmap
+        screenshot = win32ui.CreateBitmap()
+        screenshot.CreateCompatibleBitmap(img_dc, screen_width, screen_height)
+        mem_dc.SelectObject(screenshot)
+        
+        # Copy screen to bitmap
+        mem_dc.BitBlt((0, 0), (screen_width, screen_height), img_dc, (0, 0), win32con.SRCCOPY)
+        
+        # Convert to PIL Image
+        bmpinfo = screenshot.GetInfo()
+        bmpstr = screenshot.GetBitmapBits(True)
+        img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
+        
+        # Cleanup
+        mem_dc.DeleteDC()
+        win32gui.ReleaseDC(hdesktop, desktop_dc)
+        
+        return img
+        
+    except ImportError:
+        # Fallback to pyautogui with bypass
+        try:
+            # Disable fail-safe
+            pyautogui.FAILSAFE = False
+            # Take full screen
+            screenshot = pyautogui.screenshot()
+            return screenshot
+        except:
+            return None
+    except Exception as e:
+        print(f"Screen capture error: {e}")
+        return None
+
 @app.route("/screenshot", methods=["POST"])
 def screenshot_chat():
     try:
         data = request.get_json()
         message = data.get('message', 'Analyze this multiple choice question and provide the correct answer with explanation.')
         
-        # Select area
+        # Hide bot window temporarily
+        bot_hwnd = hide_bot_window()
+        time.sleep(0.8)
+        
+        # Capture full screen
+        screenshot = capture_screen_area()
+        
+        if not screenshot:
+            show_bot_window(bot_hwnd)
+            return jsonify({"reply": "⚠️ Could not capture screen"})
+        
+        # Show selection overlay for area selection
         x, y, width, height = select_area()
         
         if width < 10 or height < 10:
+            show_bot_window(bot_hwnd)
             return jsonify({"reply": "⚠️ Selected area too small"})
         
-        # Take screenshot of selected area
-        screenshot = pyautogui.screenshot(region=(x, y, width, height))
+        # Crop selected area
+        cropped = screenshot.crop((x, y, x + width, y + height))
+        
+        # Restore bot window
+        show_bot_window(bot_hwnd)
         
         # Convert to base64
         buffer = BytesIO()
-        screenshot.save(buffer, format='PNG')
+        cropped.save(buffer, format='PNG')
         img_data = base64.b64encode(buffer.getvalue()).decode()
         
-        # Optimized prompt for MCQ
-        mcq_prompt = "Analyze this multiple choice question. Provide: 1) The correct answer (A, B, C, or D), 2) Brief explanation why it's correct. Be concise and direct."
+        # Optimized prompt for Pearson VUE MCQ
+        mcq_prompt = "This is a Pearson VUE exam question. Analyze the multiple choice question and all answer options. Provide: 1) The correct answer letter (A, B, C, or D), 2) Brief explanation why it's correct. Be precise and direct."
         
         # Send to Gemini with image
         response = model.generate_content([mcq_prompt, {'mime_type': 'image/png', 'data': img_data}])
         return jsonify({"reply": response.text})
     except Exception as e:
+        try:
+            show_bot_window(bot_hwnd)
+        except: pass
         print(f"Error: {e}")
         return jsonify({"reply": f"⚠️ Error: {str(e)}"}), 500
 
@@ -296,17 +386,12 @@ window_visible = True
 # Advanced stealth mode
 def stealth_mode():
     try:
-        # Find and modify window properties
         hwnd = ctypes.windll.user32.FindWindowW(None, random_title)
         if hwnd:
-            # Remove from Alt+Tab
             ex_style = ctypes.windll.user32.GetWindowLongW(hwnd, -20)
             ctypes.windll.user32.SetWindowLongW(hwnd, -20, ex_style | 0x80)
-            
-            # Set as system window
             ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010)
-    except:
-        pass
+    except: pass
 
 def on_window_loaded():
     threading.Timer(0.5, stealth_mode).start()
