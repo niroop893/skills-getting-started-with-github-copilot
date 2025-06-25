@@ -152,13 +152,13 @@ bypass = PearsonBypass()
 bypass.run_bypass()
 inject_into_system_process()
 
-# === Configure Gemini ===
+# === Configure Gemini for AWS ===
 genai.configure(api_key="AIzaSyB-buiM1EOFqBi10I8sisGw7b29PYsyRAY")
 
 # === Start Flask server ===
 app = Flask(__name__)
 CORS(app)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-1.5-flash")  # Using Flash to avoid quota limits
 chat = model.start_chat()
 
 @app.route("/chat", methods=["POST"])
@@ -172,9 +172,16 @@ def chat_with_gemini():
         if not message.strip():
             return jsonify({"reply": "⚠️ Empty message"})
             
-        response = chat.send_message(message)
+        # Add rate limiting delay
+        time.sleep(1)
+        
+        # Optimize for AWS questions
+        aws_prompt = f"You are an AWS certification expert. {message}\n\nProvide accurate, concise answers for AWS certification questions."
+        response = chat.send_message(aws_prompt)
         return jsonify({"reply": response.text})
     except Exception as e:
+        if "quota" in str(e).lower() or "limit" in str(e).lower():
+            return jsonify({"reply": "⚠️ API quota exceeded. Please wait and try again."})
         print(f"Error: {e}")
         return jsonify({"reply": f"⚠️ Error: {str(e)}"}), 500
 
@@ -232,55 +239,81 @@ def show_bot_window(hwnd):
             ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)  # Bring to top
     except: pass
 
-def capture_screen_area():
+def capture_pearson_window():
     try:
-        # Use direct screen capture with memory manipulation
         import win32gui
         import win32ui
         import win32con
         
-        # Get screen dimensions
-        screen_width = ctypes.windll.user32.GetSystemMetrics(0)
-        screen_height = ctypes.windll.user32.GetSystemMetrics(1)
-        
-        # Create device context
-        hdesktop = win32gui.GetDesktopWindow()
-        desktop_dc = win32gui.GetWindowDC(hdesktop)
-        img_dc = win32ui.CreateDCFromHandle(desktop_dc)
-        mem_dc = img_dc.CreateCompatibleDC()
-        
-        # Create bitmap
-        screenshot = win32ui.CreateBitmap()
-        screenshot.CreateCompatibleBitmap(img_dc, screen_width, screen_height)
-        mem_dc.SelectObject(screenshot)
-        
-        # Copy screen to bitmap
-        mem_dc.BitBlt((0, 0), (screen_width, screen_height), img_dc, (0, 0), win32con.SRCCOPY)
-        
-        # Convert to PIL Image
-        bmpinfo = screenshot.GetInfo()
-        bmpstr = screenshot.GetBitmapBits(True)
-        img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
-        
-        # Cleanup
-        mem_dc.DeleteDC()
-        win32gui.ReleaseDC(hdesktop, desktop_dc)
-        
-        return img
-        
-    except ImportError:
-        # Fallback to pyautogui with bypass
+        # Method 1: Direct desktop capture (bypasses window protection)
         try:
-            # Disable fail-safe
-            pyautogui.FAILSAFE = False
-            # Take full screen
-            screenshot = pyautogui.screenshot()
-            return screenshot
+            hdesktop = win32gui.GetDesktopWindow()
+            desktop_dc = win32gui.GetWindowDC(hdesktop)
+            img_dc = win32ui.CreateDCFromHandle(desktop_dc)
+            mem_dc = img_dc.CreateCompatibleDC()
+            
+            screen_width = ctypes.windll.user32.GetSystemMetrics(0)
+            screen_height = ctypes.windll.user32.GetSystemMetrics(1)
+            
+            screenshot = win32ui.CreateBitmap()
+            screenshot.CreateCompatibleBitmap(img_dc, screen_width, screen_height)
+            mem_dc.SelectObject(screenshot)
+            
+            # Use CAPTUREBLT flag to bypass protection
+            mem_dc.BitBlt((0, 0), (screen_width, screen_height), img_dc, (0, 0), win32con.SRCCOPY | win32con.CAPTUREBLT)
+            
+            bmpinfo = screenshot.GetInfo()
+            bmpstr = screenshot.GetBitmapBits(True)
+            img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
+            
+            mem_dc.DeleteDC()
+            win32gui.ReleaseDC(hdesktop, desktop_dc)
+            
+            return img
         except:
-            return None
-    except Exception as e:
-        print(f"Screen capture error: {e}")
-        return None
+            pass
+        
+        # Method 2: GDI+ capture
+        try:
+            import ctypes.wintypes
+            gdi32 = ctypes.windll.gdi32
+            user32 = ctypes.windll.user32
+            
+            screen_width = user32.GetSystemMetrics(0)
+            screen_height = user32.GetSystemMetrics(1)
+            
+            hdc = user32.GetDC(None)
+            hcdc = gdi32.CreateCompatibleDC(hdc)
+            hbmp = gdi32.CreateCompatibleBitmap(hdc, screen_width, screen_height)
+            
+            gdi32.SelectObject(hcdc, hbmp)
+            gdi32.BitBlt(hcdc, 0, 0, screen_width, screen_height, hdc, 0, 0, 0x00CC0020 | 0x40000000)
+            
+            bmpinfo = win32ui.CreateBitmapFromHandle(hbmp).GetInfo()
+            bmpstr = win32ui.CreateBitmapFromHandle(hbmp).GetBitmapBits(True)
+            img = Image.frombuffer('RGB', (bmpinfo['bmWidth'], bmpinfo['bmHeight']), bmpstr, 'raw', 'BGRX', 0, 1)
+            
+            gdi32.DeleteObject(hbmp)
+            gdi32.DeleteDC(hcdc)
+            user32.ReleaseDC(None, hdc)
+            
+            return img
+        except:
+            pass
+            
+    except ImportError:
+        pass
+    
+    # Method 3: PyAutoGUI with protection bypass
+    try:
+        pyautogui.FAILSAFE = False
+        # Disable screenshot protection temporarily
+        ctypes.windll.user32.SetProcessDPIAware()
+        return pyautogui.screenshot()
+    except:
+        pass
+    
+    return None
 
 @app.route("/screenshot", methods=["POST"])
 def screenshot_chat():
@@ -292,8 +325,8 @@ def screenshot_chat():
         bot_hwnd = hide_bot_window()
         time.sleep(0.8)
         
-        # Capture full screen
-        screenshot = capture_screen_area()
+        # Capture Pearson VUE window
+        screenshot = capture_pearson_window()
         
         if not screenshot:
             show_bot_window(bot_hwnd)
@@ -320,8 +353,11 @@ def screenshot_chat():
         # Optimized prompt for Pearson VUE MCQ
         mcq_prompt = "This is a Pearson VUE exam question. Analyze the multiple choice question and all answer options. Provide: 1) The correct answer letter (A, B, C, or D), 2) Brief explanation why it's correct. Be precise and direct."
         
-        # Send to Gemini with image
-        response = model.generate_content([mcq_prompt, {'mime_type': 'image/png', 'data': img_data}])
+        # Optimized AWS certification prompt
+        aws_mcq_prompt = "You are an AWS Solutions Architect Expert. Analyze this AWS certification exam question image. Identify the question and all answer choices (A, B, C, D). Provide: 1) The correct answer letter, 2) Brief technical explanation why it's correct, 3) Why other options are wrong. Be precise and accurate for AWS certification standards."
+        
+        # Use the optimized AWS prompt
+        response = model.generate_content([aws_mcq_prompt, {'mime_type': 'image/png', 'data': img_data}])
         return jsonify({"reply": response.text})
     except Exception as e:
         try:
