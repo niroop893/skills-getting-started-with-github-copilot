@@ -1,0 +1,12 @@
+@ Virtual Camera Error x
+
+Failed to start virtual camera:
+
+‘obs’ backend: OBS Virtual Camera device not found! Did you
+install OBS?
+
+“unitycapture’ backend: No camera registered. Did you install
+any camera?
+
+Make sure OBS Virtual Camera is installed!
+

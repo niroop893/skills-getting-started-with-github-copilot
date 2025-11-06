@@ -331,7 +331,7 @@ def screenshot_chat():
         if not screenshot:
             show_bot_window(bot_hwnd)
             return jsonify({"reply": "⚠️ Could not capture screen"})
-        
+        1
         # Show selection overlay for area selection
         x, y, width, height = select_area()
         

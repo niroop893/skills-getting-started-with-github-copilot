@@ -1,0 +1,7 @@
+anonymous
+admin
+root
+ftp
+ftpuser
+user
+test

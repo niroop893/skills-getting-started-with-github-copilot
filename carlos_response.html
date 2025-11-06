@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link href=/resources/labheader/css/academyLabHeader.css rel=stylesheet>
+        <link href=/resources/css/labs.css rel=stylesheet>
+        <title>Exploiting cache server normalization for web cache deception</title>
+    </head>
+    <body>
+        <script type="text/javascript" src="/resources/js/tracking.js"></script>
+        <script src="/resources/labheader/js/labHeader.js"></script>
+        <div id="academyLabHeader">
+            <section class='academyLabBanner'>
+                <div class=container>
+                    <div class=logo></div>
+                        <div class=title-container>
+                            <h2>Exploiting cache server normalization for web cache deception</h2>
+                            <a id='exploit-link' class='button' target='_blank' href='https://exploit-0a65002803308bb2815e108e01a4004c.exploit-server.net'>Go to exploit server</a>
+                            <button id='submitSolution' class='button' method='POST' path='/submitSolution' parameter='answer' >Submit solution</button>
+                            <script src='/resources/labheader/js/submitSolution.js'></script>
+                            <a class=link-back href='https://portswigger.net/web-security/web-cache-deception/lab-wcd-exploiting-cache-server-normalization'>
+                                Back&nbsp;to&nbsp;lab&nbsp;description&nbsp;
+                                <svg version=1.1 id=Layer_1 xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x=0px y=0px viewBox='0 0 28 30' enable-background='new 0 0 28 30' xml:space=preserve title=back-arrow>
+                                    <g>
+                                        <polygon points='1.4,0 0,1.2 12.6,15 0,28.8 1.4,30 15.1,15'></polygon>
+                                        <polygon points='14.3,0 12.9,1.2 25.6,15 12.9,28.8 14.3,30 28,15'></polygon>
+                                    </g>
+                                </svg>
+                            </a>
+                        </div>
+                        <div class='widgetcontainer-lab-status is-notsolved'>
+                            <span>LAB</span>
+                            <p>Not solved</p>
+                            <span class=lab-status-icon></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div theme="">
+            <section class="maincontainer">
+                <div class="container is-page">
+                    <header class="navigation-header">
+                        <section class="top-links">
+                            <a href=/>Home</a><p>|</p>
+                            <a href="/my-account">My account</a><p>|</p>
+                            <a href="/logout">Log out</a><p>|</p>
+                        </section>
+                    </header>
+                    <header class="notification-header">
+                    </header>
+                    <h1>My Account</h1>
+                    <div id=account-content>
+                        <p>Your username is: carlos</p>
+                        <div>Your API Key is: cK0YSRjYsApSISMziZgLlg3wW14IRMeK</div><br/>
+                        <form class="login-form" name="change-email-form" action="/my-account/change-email" method="POST">
+                            <label>Email</label>
+                            <input required type="email" name="email" value="">
+                            <input required type="hidden" name="csrf" value="NdGnGoRhsMboHwsFWVtWGfwb9wDslWwq">
+                            <button class='button' type='submit'> Update email </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+            <div class="footer-wrapper">
+            </div>
+        </div>
+    </body>
+</html>

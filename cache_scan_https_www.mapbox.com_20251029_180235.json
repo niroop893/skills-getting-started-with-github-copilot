@@ -1,0 +1,13 @@
+{
+  "cache_deception": [],
+  "cache_poisoning": [],
+  "cache_headers": {
+    "X-Cache": "HIT, MISS",
+    "CF-Cache-Status": "DYNAMIC",
+    "Age": "134278",
+    "Via": "1.1 varnish",
+    "X-Cache-Hits": "23, 0",
+    "X-Served-By": "cache-fra-etou8220196-FRA, cache-fra-eddf8230161-FRA"
+  },
+  "vulnerable": false
+}

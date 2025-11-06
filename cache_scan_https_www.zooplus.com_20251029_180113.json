@@ -1,0 +1,11 @@
+{
+  "cache_deception": [],
+  "cache_poisoning": [],
+  "cache_headers": {
+    "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+    "X-Cache": "Hit from cloudfront",
+    "Age": "485",
+    "Via": "1.1 16f88a640328f5c5351c2916207f0148.cloudfront.net (CloudFront)"
+  },
+  "vulnerable": false
+}
