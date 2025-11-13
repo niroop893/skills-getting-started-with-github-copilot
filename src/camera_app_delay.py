@@ -51,6 +51,9 @@ class VirtualDelayedCameraGUI:
         self.file_mode = False
         self.save_folder = r"C:\Users\NiroopkumarShetty\Documents\Niroop"
         
+        # NEW: Live streaming mode (no delay)
+        self.live_mode = False
+        
         self.running = False
         self.preview_running = False
         self.virtual_cam = None
@@ -175,46 +178,53 @@ class VirtualDelayedCameraGUI:
         self.progress = ttk.Progressbar(progress_frame, length=350, mode='determinate')
         self.progress.pack(pady=3)
         
-        # ===== BUTTONS (Modified with 3 rows) =====
+        # ===== BUTTONS (Modified with 4 rows - ADDED LIVE STREAMING) =====
         btn_frame = tk.Frame(scrollable_frame, pady=10)
         btn_frame.pack()
+        
+        # Row 0 - NEW: LIVE STREAMING BUTTON
+        self.live_stream_btn = tk.Button(btn_frame, text="📹 LIVE STREAMING (No Delay)", 
+                                        command=self.start_live_streaming,
+                                        bg="#00C853", fg="white", font=("Arial", 10, "bold"),
+                                        width=55, height=2)
+        self.live_stream_btn.grid(row=0, column=0, columnspan=3, pady=5)
         
         # Row 1 - Main controls
         self.start_btn = tk.Button(btn_frame, text="▶ START DELAYED", 
                                    command=self.start, bg="green", fg="white",
                                    font=("Arial", 10, "bold"), width=18, height=2)
-        self.start_btn.grid(row=0, column=0, padx=5)
+        self.start_btn.grid(row=1, column=0, padx=5)
         
         self.freeze_btn = tk.Button(btn_frame, text="🔄 FREEZE & LOOP", 
                                     command=self.toggle_loop,
                                     bg="orange", fg="white", font=("Arial", 10, "bold"),
                                     width=18, height=2, state=tk.DISABLED)
-        self.freeze_btn.grid(row=0, column=1, padx=5)
+        self.freeze_btn.grid(row=1, column=1, padx=5)
         
         self.stop_btn = tk.Button(btn_frame, text="⬛ STOP", command=self.stop,
                                   bg="red", fg="white", font=("Arial", 10, "bold"),
                                   width=15, height=2, state=tk.DISABLED)
-        self.stop_btn.grid(row=0, column=2, padx=5)
+        self.stop_btn.grid(row=1, column=2, padx=5)
         
         # Row 2 - Save button
         self.save_replay_btn = tk.Button(btn_frame, text="💾 SAVE BUFFER TO FILE", 
                                          command=self.save_and_replay,
                                          bg="purple", fg="white", font=("Arial", 9, "bold"),
                                          width=55, height=2, state=tk.DISABLED)
-        self.save_replay_btn.grid(row=1, column=0, columnspan=3, pady=5)
+        self.save_replay_btn.grid(row=2, column=0, columnspan=3, pady=5)
         
-        # Row 3 - NEW Load and Play button
+        # Row 3 - Load and Play button
         self.load_play_btn = tk.Button(btn_frame, text="📂 LOAD & PLAY FILE (Select .pkl)", 
                                        command=self.load_and_play_file,
                                        bg="teal", fg="white", font=("Arial", 9, "bold"),
                                        width=55, height=2)
-        self.load_play_btn.grid(row=2, column=0, columnspan=3, pady=5)
+        self.load_play_btn.grid(row=3, column=0, columnspan=3, pady=5)
         
         # ===== MODE INDICATOR =====
         self.mode_frame = tk.Frame(scrollable_frame, bg="white", relief=tk.RIDGE, bd=3)
         self.mode_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        self.mode_label = tk.Label(self.mode_frame, text="MODE: Live Delayed", 
+        self.mode_label = tk.Label(self.mode_frame, text="MODE: Preview", 
                                    font=("Arial", 11, "bold"), fg="blue", bg="white", pady=5)
         self.mode_label.pack()
         
@@ -234,6 +244,11 @@ class VirtualDelayedCameraGUI:
 1. Install OBS Studio (click warning link above if not installed)
 2. Open OBS → Tools → Start Virtual Camera → Close OBS
 
+USAGE - LIVE STREAMING (NEW):
+1. Click "LIVE STREAMING" - starts normal live video (NO DELAY)
+2. Perfect for real-time video calls
+3. Can switch to file loop later using "LOAD & PLAY FILE"
+
 USAGE - DELAYED MODE:
 1. Set your delay time
 2. Click "START DELAYED" - video will be delayed continuously
@@ -249,8 +264,8 @@ USAGE - SAVE BUFFER:
 2. Buffer is saved to: C:\\Users\\NiroopkumarShetty\\Documents\\Niroop
 3. Plays saved buffer in loop
 
-USAGE - LOAD FILE (NEW):
-1. Click "LOAD & PLAY FILE" (works anytime, even without camera)
+USAGE - LOAD FILE:
+1. Click "LOAD & PLAY FILE" (works anytime, even during live streaming)
 2. Select a .pkl file from your computer
 3. Plays selected file in loop forever
 4. Perfect for pre-recorded loops!
@@ -317,6 +332,108 @@ Select "OBS Virtual Camera" in Zoom/Teams/Meet."""
         self.buffer_label.config(
             text=f"Buffer: {self.buffer_size} frames | ~{ram_mb:.0f} MB RAM | {self.delay_seconds}s delay"
         )
+    
+    # NEW: Start live streaming (no delay)
+    def start_live_streaming(self):
+        """Start live streaming without any delay"""
+        # Check if OBS is installed
+        try:
+            test_cam = pyvirtualcam.Camera(width=640, height=480, fps=30)
+            test_cam.close()
+        except Exception as e:
+            messagebox.showerror(
+                "OBS Not Found!",
+                "OBS Virtual Camera is not installed!\n\n"
+                "STEPS TO FIX:\n"
+                "1. Download OBS Studio from:\n"
+                "   https://obsproject.com/download\n\n"
+                "2. Install it\n\n"
+                "3. Open OBS Studio\n\n"
+                "4. Click Tools → Start Virtual Camera\n\n"
+                "5. Close OBS and try again\n\n"
+                "Click OK to open download page..."
+            )
+            webbrowser.open("https://obsproject.com/download")
+            return
+        
+        self.running = True
+        self.live_mode = True
+        self.loop_mode = False
+        self.file_mode = False
+        
+        # Disable start buttons
+        self.live_stream_btn.config(state=tk.DISABLED)
+        self.start_btn.config(state=tk.DISABLED)
+        self.stop_btn.config(state=tk.NORMAL)
+        
+        # Enable load file button
+        self.load_play_btn.config(state=tk.NORMAL)
+        
+        self.mode_label.config(text="MODE: Live Streaming (Real-time)", fg="green")
+        self.status.config(text="● Starting live stream...", fg="orange")
+        
+        threading.Thread(target=self.live_streaming_loop, daemon=True).start()
+    
+    def live_streaming_loop(self):
+        """Live streaming loop - direct camera to virtual camera (no delay)"""
+        try:
+            # Start virtual camera
+            self.virtual_cam = pyvirtualcam.Camera(
+                width=self.width, 
+                height=self.height,
+                fps=self.fps, 
+                fmt=pyvirtualcam.PixelFormat.BGR
+            )
+            
+            device_name = "OBS Virtual Camera"
+            self.status.config(
+                text=f"● LIVE STREAMING! Select '{device_name}' in your app", 
+                fg="green"
+            )
+            
+            messagebox.showinfo(
+                "Live Streaming Started!",
+                f"Live streaming is now ACTIVE!\n\n"
+                f"In your video app (Zoom, Teams, etc.):\n"
+                f"1. Open Settings\n"
+                f"2. Go to Video/Camera settings\n"
+                f"3. Select: {device_name}\n\n"
+                f"Your camera feed is streaming in REAL-TIME (no delay)!\n\n"
+                f"You can:\n"
+                f"• Click 'LOAD & PLAY FILE' anytime to switch to file loop\n"
+                f"• Click 'STOP' to end streaming\n\n"
+                f"Keep this window open (can minimize it)."
+            )
+            
+            frame_count = 0
+            
+            while self.running and self.live_mode:
+                # Read frame directly from camera
+                ret, frame = self.cap.read()
+                if not ret:
+                    time.sleep(0.01)
+                    continue
+                
+                # Send directly to virtual camera (no delay, no buffer)
+                self.virtual_cam.send(frame)
+                self.virtual_cam.sleep_until_next_frame()
+                
+                # Update preview every 10 frames
+                if frame_count % 10 == 0:
+                    self.update_preview(frame)
+                
+                frame_count += 1
+        
+        except Exception as e:
+            error_msg = str(e)
+            self.status.config(text=f"● Error: Virtual camera failed", fg="red")
+            messagebox.showerror("Virtual Camera Error", 
+                f"Failed to start virtual camera:\n{error_msg}\n\n"
+                "Make sure:\n"
+                "1. OBS Studio is installed\n"
+                "2. OBS Virtual Camera is started (Tools → Start Virtual Camera)\n"
+                "3. No other app is using the virtual camera")
+            self.stop()
     
     def toggle_loop(self):
         """Toggle between live delayed and loop mode"""
@@ -407,7 +524,7 @@ Select "OBS Virtual Camera" in Zoom/Teams/Meet."""
             messagebox.showerror("Error", f"Failed to save/load buffer:\n{str(e)}")
     
     def load_and_play_file(self):
-        """NEW: Load a .pkl file and play it in loop"""
+        """Load a .pkl file and play it in loop"""
         # Open file dialog
         file_path = filedialog.askopenfilename(
             title="Select Video Buffer File",
@@ -432,9 +549,8 @@ Select "OBS Virtual Camera" in Zoom/Teams/Meet."""
                 messagebox.showerror("Error", "Invalid file format or empty buffer!")
                 return
             
-            # Check if virtual camera is already running
+            # If not already running, start virtual camera
             if not self.running:
-                # Start virtual camera first
                 try:
                     self.virtual_cam = pyvirtualcam.Camera(
                         width=self.width, 
@@ -443,6 +559,7 @@ Select "OBS Virtual Camera" in Zoom/Teams/Meet."""
                         fmt=pyvirtualcam.PixelFormat.BGR
                     )
                     self.running = True
+                    self.live_stream_btn.config(state=tk.DISABLED)
                     self.start_btn.config(state=tk.DISABLED)
                     self.stop_btn.config(state=tk.NORMAL)
                     
@@ -452,10 +569,11 @@ Select "OBS Virtual Camera" in Zoom/Teams/Meet."""
                         "Make sure OBS Virtual Camera is installed and started.")
                     return
             
-            # Set loaded buffer for looping
+            # Switch to file mode
             self.frozen_buffer = loaded_buffer
             self.file_mode = True
             self.loop_mode = True
+            self.live_mode = False  # Stop live streaming
             self.loop_index = 0
             
             # Update UI
@@ -535,6 +653,9 @@ Select "OBS Virtual Camera" in Zoom/Teams/Meet."""
         self.running = True
         self.loop_mode = False
         self.file_mode = False
+        self.live_mode = False
+        
+        self.live_stream_btn.config(state=tk.DISABLED)
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
         self.quick_slider.config(state=tk.DISABLED)
@@ -550,8 +671,10 @@ Select "OBS Virtual Camera" in Zoom/Teams/Meet."""
         self.running = False
         self.loop_mode = False
         self.file_mode = False
+        self.live_mode = False
         self.frozen_buffer = []
         
+        self.live_stream_btn.config(state=tk.NORMAL)
         self.start_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
         self.freeze_btn.config(state=tk.DISABLED)

